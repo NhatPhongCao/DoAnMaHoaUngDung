@@ -65,4 +65,12 @@ public class A5 {
         }
         return stream;
     }
+    public int[] giaiMa(int[] ciphertext) {
+        int[] keystream = maHoa(ciphertext.length);
+        int[] plaintext = new int[ciphertext.length];
+        for (int i = 0; i < ciphertext.length; i++) {
+            plaintext[i] = ciphertext[i] ^ keystream[i];
+        }
+        return plaintext;
+    }
 }
