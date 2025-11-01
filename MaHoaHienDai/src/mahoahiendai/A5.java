@@ -5,6 +5,8 @@
  */
 package mahoahiendai;
 
+import java.nio.file.Paths;
+
 /**
  *
  * @author Admin
@@ -72,5 +74,48 @@ public class A5 {
             plaintext[i] = ciphertext[i] ^ keystream[i];
         }
         return plaintext;
+    }
+    public static int[] doiInt(byte[] bytes) {
+    int[] bits = new int[bytes.length * 8];
+    for (int i = 0; i < bytes.length; i++) {
+        for (int bit = 0; bit < 8; bit++) {
+            // Lấy từng bit từ trái sang phải
+            bits[i * 8 + bit] = (bytes[i] >> (7 - bit)) & 1;
+        }
+    }
+    return bits;
+    }
+    public static byte[] doiByte(int[] bits) {
+    int byteLength = bits.length / 8;
+    byte[] bytes = new byte[byteLength];
+    for (int i = 0; i < byteLength; i++) {
+        byte value = 0;
+        for (int bit = 0; bit < 8; bit++) {
+            value <<= 1;                   // Dịch trái 1 bit
+            value |= (bits[i * 8 + bit] & 1); // Thêm bit mới
+        }
+        bytes[i] = value;
+    }
+    return bytes;
+    }  
+    public static String maHoaTen(String ten, A5 a5) {
+        byte[] bytes = ten.getBytes();
+        int[] bits = A5.doiInt(bytes);
+        int[] enc = a5.maHoa(bits.length);
+        for (int i = 0; i < bits.length; i++) {
+            bits[i] ^= enc[i];
+        }
+        byte[] out = A5.doiByte(bits);
+        return new String(out);
+    }
+    public static String giaiMaTen(String tenMaHoa, A5 a5) {
+        byte[] bytes = tenMaHoa.getBytes();
+        int[] bits = A5.doiInt(bytes);
+        int[] enc = a5.maHoa(bits.length);
+        for (int i = 0; i < bits.length; i++) {
+            bits[i] ^= enc[i];
+        }
+        byte[] out = A5.doiByte(bits);
+        return new String(out);
     }
 }
