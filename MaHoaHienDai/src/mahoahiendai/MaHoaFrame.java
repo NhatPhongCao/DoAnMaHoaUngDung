@@ -6,6 +6,8 @@ package mahoahiendai;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import javax.swing.JFileChooser;
@@ -22,11 +24,12 @@ public class MaHoaFrame extends javax.swing.JFrame {
      */
     byte[] fileData = null;
     String filePath = null;
-    byte[] fileData2 = null;
+    String filePath2 = null;
     JFileChooser chooser = new JFileChooser();
     String fileName = null;
     String duoiFile = null;
     String tenFileMaHoa = null;
+    String duongDanMoi = null;
     public MaHoaFrame() {
         initComponents();
     }
@@ -312,43 +315,48 @@ public class MaHoaFrame extends javax.swing.JFrame {
         return;
         }
         try {
-            String fileDeGiaiMa = chooser.getSelectedFile().getAbsolutePath();
             duoiFile = filePath.substring(filePath.lastIndexOf("."));
             // mã hóa RC4
-            RC4 rc4 = new RC4(txtRC4Key.getText().getBytes("UTF-8"));
-            byte[] encrypted = rc4.maHoa(fileData);
-            // hiển thị kết quả dạng Base64
-            String ketQua = Base64.getEncoder().encodeToString(encrypted);
-            txtRC4CT.setText(ketQua);
-            xulyFile.ghiFile(filePath, encrypted);
-            fileData2=encrypted;
-            String fileMoi = fileDeGiaiMa.replace(".rc4", "");
+            RC4 rc4ForFile = new RC4(txtRC4Key.getText().getBytes("UTF-8"));
+            RC4 rc4ForName = new RC4(txtRC4Key.getText().getBytes("UTF-8"));
+            byte[] encryptedFile = rc4ForFile.maHoa(fileData);
+            xulyFile.ghiFile(filePath, encryptedFile);
+            String fileMoi = filePath.replace(".rc4", "");
             //mã hóa tên file
-            byte[] encryptedName = rc4.maHoa(fileMoi.getBytes(StandardCharsets.UTF_8));
+            byte[] encryptedName = rc4ForName.maHoa(fileMoi.getBytes());
             // đỗi sang Base64 để dùng làm tên file hợp lệ
             tenFileMaHoa = Base64.getUrlEncoder().encodeToString(encryptedName);
             fileName = tenFileMaHoa+duoiFile;
-            xulyFile.doiTenFile(fileDeGiaiMa, fileName);
+            Path cu = Paths.get(filePath);
+            String thuMuc = cu.getParent().toString();
+            duongDanMoi = thuMuc + "/" + fileName;
+            xulyFile.doiTenFile(filePath, duongDanMoi);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Lỗi mã hóa: " + e.getMessage());
         }
     }//GEN-LAST:event_btnEncrypActionPerformed
 
     private void btnDecrypActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDecrypActionPerformed
-        if (fileData2 == null) {
+        if (fileData == null) {
         JOptionPane.showMessageDialog(this, "Bạn chưa chọn file!");
         return;
         }
         try {
-            String fileDeGiaiMa = chooser.getSelectedFile().getAbsolutePath();
             // mã hóa RC4
             RC4 rc4 = new RC4(txtRC4Key.getText().getBytes("UTF-8"));
-            byte[] encrypted = rc4.giaiMa(fileData2);
+            RC4 rc4ForName = new RC4(txtRC4Key.getText().getBytes("UTF-8"));
+            byte[] encrypted = rc4.giaiMa(fileData);
             // hiển thị kết quả dạng Base64
             String ketQua = Base64.getEncoder().encodeToString(encrypted);
             txtRC4PT.setText(ketQua);
-            xulyFile.ghiFile(filePath, encrypted);
-            xulyFile.doiTenFile(fileDeGiaiMa, filePath);
+            xulyFile.ghiFile(filePath2, encrypted);
+            //String fileMoi = filePath.replace(".rc4", "");
+            String tenMaHoa = xulyFile.layTenFile(filePath2);
+            String tenBase64 = xulyFile.xoaDuoiFile(tenMaHoa);
+            byte[] nameBytesEncrypted = Base64.getUrlDecoder().decode(tenBase64);
+            byte[] nameBytesDecrypted = rc4ForName.maHoa(nameBytesEncrypted);
+            String tenGoc = new String(nameBytesDecrypted, StandardCharsets.UTF_8);
+            xulyFile.doiTenFile(filePath2, tenGoc);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Lỗi giải mã: " + e.getMessage());
         }
@@ -375,55 +383,54 @@ public class MaHoaFrame extends javax.swing.JFrame {
 
     private void btnA5DecryptionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnA5DecryptionActionPerformed
         try {
-        byte[] data = xulyFile.docFile(filePath);
-        String keyText =txtA5Key.getText();
+        byte[] data = xulyFile.docFile(filePath2);
+        String keyText = txtA5Key.getText();
+        if (keyText == null || keyText.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Bạn chưa nhập key!");
+            return;
+        }
         int[] key = new int[keyText.length()];
-        for (int i = 0; i < keyText.length(); i++) {
-            key[i]=keyText.charAt(i);
-        }
-        A5 a5 = new A5(key);
-        // ---- Giải mã nội dung ----
+        for (int i = 0; i < keyText.length(); i++) key[i] = keyText.charAt(i) & 1;
+        A5 a5Data = new A5(key);
         int[] bits = A5.doiInt(data);
-        int[] enc = a5.maHoa(bits.length);
-        for (int i = 0; i < bits.length; i++) bits[i] ^= enc[i];
+        int[] keystream = a5Data.maHoa(bits.length);
+        for (int i = 0; i < bits.length; i++) bits[i] ^= keystream[i];
         byte[] outBytes = A5.doiByte(bits);
-        // ---- Giải mã tên file ----
-        String tenMaHoa = xulyFile.layTenFile(filePath); // file mã hóa
-        tenMaHoa = xulyFile.xoaDuoiFile(tenMaHoa);      // bỏ .bin
-        String tenGoc = A5.giaiMaTen(tenMaHoa, a5);         // giải mã tên gốc
-        String folder = Paths.get(filePath).getParent().toString();
-        String outPath = folder + "\\" + tenGoc;
+        String outPath = filePath;
         xulyFile.ghiFile(outPath, outBytes);
-        JOptionPane.showMessageDialog(this, "Đã giải mã:\n" + outPath);
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Lỗi: " + e.getMessage());
-        }
+        Files.delete(Paths.get(filePath2));
+        txtA5PT.setText(outPath);
+        JOptionPane.showMessageDialog(this, "Đã giải mã: " + outPath);
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(this, "Lỗi: " + e.getMessage());
+    }
     }//GEN-LAST:event_btnA5DecryptionActionPerformed
 
     private void btnA5EncryptionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnA5EncryptionActionPerformed
         try {
         byte[] data = xulyFile.docFile(filePath);
-        String keyText =txtA5Key.getText();
+        String keyText = txtA5Key.getText();
         int[] key = new int[keyText.length()];
         for (int i = 0; i < keyText.length(); i++) {
-            key[i]=keyText.charAt(i);
+            key[i] = keyText.charAt(i) & 1;
         }
-        A5 a5 = new A5(key);
+        A5 a5Data = new A5(key);
+        A5 a5Name = new A5(key);
         // ---- Mã hóa dữ liệu ----
         int[] bits = A5.doiInt(data);
-        int[] enc = a5.maHoa(bits.length);
-        for (int i = 0; i < bits.length; i++) bits[i] ^= enc[i];
+        int[] enc = a5Data.maHoa(bits.length);
+        for (int i = 0; i < bits.length; i++)
+            bits[i] ^= enc[i];
         byte[] encryptedBytes = A5.doiByte(bits);
-        // ---- Xử lý tên file ----
-        String tenFile = xulyFile.layTenFile(filePath);       // vd: screenshot.png
-        String tenMaHoa = A5.maHoaTen(tenFile, a5);              // mã hóa tên
-        // Đổi đuôi → .bin để không bị lỗi
-        tenMaHoa = xulyFile.doiDuoiFile(tenMaHoa, xulyFile.layDuoiFile(filePath));
+        String tenFile = xulyFile.layTenFile(filePath);
+        String tenFile1 = xulyFile.xoaDuoiFile(tenFile);
+        String tenMaHoa = A5.maHoaTen(tenFile1, a5Name);
+        tenMaHoa = tenMaHoa + duoiFile;
         String folder = Paths.get(filePath).getParent().toString();
         String outPath = folder + "\\" + tenMaHoa;
         xulyFile.ghiFile(outPath, encryptedBytes);
+        Files.delete(Paths.get(filePath));
         txtA5CT.setText(outPath);
-        filePath=outPath;
         JOptionPane.showMessageDialog(this, "Đã mã hóa:\n" + outPath);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Lỗi: " + e.getMessage());
@@ -434,14 +441,14 @@ public class MaHoaFrame extends javax.swing.JFrame {
         JFileChooser chooser = new JFileChooser();
         int result = chooser.showOpenDialog(this);
         if (result == JFileChooser.APPROVE_OPTION) {
-            filePath = chooser.getSelectedFile().getAbsolutePath();
+            filePath2 = chooser.getSelectedFile().getAbsolutePath();
             try {
                 // đọc byte[]
-                fileData = xulyFile.docFile(filePath);
+                fileData = xulyFile.docFile(filePath2);
                 // convert sang Base64 để hiển thị an toàn (mọi loại file)
                 String hienThi = Base64.getEncoder().encodeToString(fileData);
                 // đưa vào text field
-                duoiFile = filePath.substring(filePath.lastIndexOf("."));
+                duoiFile = filePath2.substring(filePath2.lastIndexOf("."));
                 txtA5CT.setText(hienThi);
             } catch (IOException ex) {
                 JOptionPane.showMessageDialog(this, "Lỗi đọc file: " + ex.getMessage());
@@ -452,10 +459,10 @@ public class MaHoaFrame extends javax.swing.JFrame {
     private void btnFile1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnFile1ActionPerformed
         int result = chooser.showOpenDialog(this);
         if (result == JFileChooser.APPROVE_OPTION) {
-            filePath = chooser.getSelectedFile().getAbsolutePath();
+            filePath2 = chooser.getSelectedFile().getAbsolutePath();
             try {
                 // đọc byte[]
-                fileData = xulyFile.docFile(filePath);
+                fileData = xulyFile.docFile(filePath2);
                 // convert sang Base64 để hiển thị an toàn (mọi loại file)
                 String hienThi = Base64.getEncoder().encodeToString(fileData);
                 // đưa vào text field

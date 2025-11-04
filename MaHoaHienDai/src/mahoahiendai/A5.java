@@ -5,7 +5,9 @@
  */
 package mahoahiendai;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.util.Base64;
 
 /**
  *
@@ -99,14 +101,12 @@ public class A5 {
     return bytes;
     }  
     public static String maHoaTen(String ten, A5 a5) {
-        byte[] bytes = ten.getBytes();
-        int[] bits = A5.doiInt(bytes);
+        byte[] bytes = ten.getBytes(StandardCharsets.UTF_8);
+        int[] bits = doiInt(bytes);
         int[] enc = a5.maHoa(bits.length);
-        for (int i = 0; i < bits.length; i++) {
-            bits[i] ^= enc[i];
-        }
-        byte[] out = A5.doiByte(bits);
-        return new String(out);
+        for (int i = 0; i < bits.length; i++) bits[i] ^= enc[i];
+        byte[] out = doiByte(bits);
+        return Base64.getUrlEncoder().encodeToString(out);
     }
     public static String giaiMaTen(String tenMaHoa, A5 a5) {
         byte[] bytes = tenMaHoa.getBytes();
@@ -116,6 +116,6 @@ public class A5 {
             bits[i] ^= enc[i];
         }
         byte[] out = A5.doiByte(bits);
-        return new String(out);
+        return Base64.getUrlEncoder().encodeToString(out);
     }
 }
